@@ -1,114 +1,131 @@
-import streamlit as st
+import pygame
 import random
-import time
+import sys
 
-# ---------------- PAGE CONFIG ----------------
-st.set_page_config(page_title="Flappy Bird", layout="centered")
+# ---------------- INITIAL SETUP ----------------
+pygame.init()
+WIDTH, HEIGHT = 400, 600
+screen = pygame.display.set_mode((WIDTH, HEIGHT))
+pygame.display.set_caption("Flappy Bird")
+
+clock = pygame.time.Clock()
+font = pygame.font.SysFont(None, 40)
 
 # ---------------- CONSTANTS ----------------
 GRAVITY = 0.5
-FLAP = -7
-PIPE_GAP = 6
-PIPE_SPEED = 1
-WIDTH = 30
-HEIGHT = 20
-BIRD_X = 5
+FLAP_STRENGTH = -8
+PIPE_GAP = 160
+PIPE_SPEED = 4
 
-# ---------------- INITIALIZE ----------------
-def init_game():
-    st.session_state.bird_y = HEIGHT // 2
-    st.session_state.velocity = 0
-    st.session_state.pipe_x = WIDTH
-    st.session_state.pipe_gap = random.randint(4, HEIGHT - PIPE_GAP - 2)
-    st.session_state.score = 0
-    st.session_state.started = False
-    st.session_state.game_over = False
-    st.session_state.flap = False
+# ---------------- COLORS ----------------
+WHITE = (255, 255, 255)
+GREEN = (0, 200, 0)
+BLUE = (0, 150, 255)
 
+# ---------------- CLASSES ----------------
+class Bird:
+    def __init__(self):
+        self.x = 80
+        self.y = HEIGHT // 2
+        self.vel = 0
+        self.radius = 15
 
-if "bird_y" not in st.session_state:
-    init_game()
+    def flap(self):
+        self.vel = FLAP_STRENGTH
 
-# ---------------- KEYBOARD LISTENER ----------------
-st.components.v1.html(
-    """
-    <script>
-    document.addEventListener("keydown", function(e) {
-        if (e.key === "ArrowUp") {
-            window.parent.postMessage("FLAP", "*");
-        }
-    });
-    </script>
-    """,
-    height=0,
-)
+    def update(self):
+        self.vel += GRAVITY
+        self.y += self.vel
 
-# Receive key press
-msg = st.experimental_get_query_params()
-if "flap" in st.session_state and st.session_state.flap:
-    st.session_state.velocity = FLAP
-    st.session_state.flap = False
-
-# ---------------- GAME LOGIC ----------------
-def update():
-    st.session_state.velocity += GRAVITY
-    st.session_state.bird_y += st.session_state.velocity
-    st.session_state.pipe_x -= PIPE_SPEED
-
-    if st.session_state.pipe_x < 0:
-        st.session_state.pipe_x = WIDTH
-        st.session_state.pipe_gap = random.randint(4, HEIGHT - PIPE_GAP - 2)
-        st.session_state.score += 1
-
-    # Collision
-    if st.session_state.pipe_x == BIRD_X:
-        if not (st.session_state.pipe_gap <
-                st.session_state.bird_y <
-                st.session_state.pipe_gap + PIPE_GAP):
-            st.session_state.game_over = True
-
-    if st.session_state.bird_y <= 0 or st.session_state.bird_y >= HEIGHT:
-        st.session_state.game_over = True
+    def draw(self):
+        pygame.draw.circle(screen, BLUE, (self.x, int(self.y)), self.radius)
 
 
-def draw():
-    screen = []
-    for y in range(HEIGHT):
-        row = [" "] * WIDTH
+class Pipe:
+    def __init__(self):
+        self.x = WIDTH
+        self.height = random.randint(100, 400)
 
-        if int(st.session_state.bird_y) == y:
-            row[BIRD_X] = "🐦"
+    def update(self):
+        self.x -= PIPE_SPEED
 
-        if st.session_state.pipe_x == y:
-            for i in range(HEIGHT):
-                if not (st.session_state.pipe_gap <
-                        i <
-                        st.session_state.pipe_gap + PIPE_GAP):
-                    row[y] = "🟩"
+    def draw(self):
+        pygame.draw.rect(screen, GREEN, (self.x, 0, 60, self.height))
+        pygame.draw.rect(
+            screen,
+            GREEN,
+            (self.x, self.height + PIPE_GAP, 60, HEIGHT)
+        )
 
-        screen.append("".join(row))
+    def collide(self, bird):
+        bird_rect = pygame.Rect(
+            bird.x - bird.radius,
+            bird.y - bird.radius,
+            bird.radius * 2,
+            bird.radius * 2,
+        )
 
-    st.text("\n".join(screen))
+        top_pipe = pygame.Rect(self.x, 0, 60, self.height)
+        bottom_pipe = pygame.Rect(
+            self.x,
+            self.height + PIPE_GAP,
+            60,
+            HEIGHT
+        )
+
+        return bird_rect.colliderect(top_pipe) or bird_rect.colliderect(bottom_pipe)
 
 
-# ---------------- UI ----------------
-st.title("🐦 Flappy Bird — Arrow Key Version")
-st.markdown(f"### 🏆 Score: {st.session_state.score}")
-st.caption("Press ⬆️ Arrow Key to flap")
+# ---------------- GAME FUNCTION ----------------
+def main():
+    bird = Bird()
+    pipes = [Pipe()]
+    score = 0
+    running = True
 
-if not st.session_state.started:
-    if st.button("▶ Start Game"):
-        st.session_state.started = True
-        st.rerun()
+    while running:
+        clock.tick(60)
+        screen.fill(WHITE)
 
-if st.session_state.game_over:
-    st.error("💥 Game Over")
-    if st.button("🔄 Restart"):
-        init_game()
-        st.rerun()
+        # -------- EVENTS --------
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
 
-if st.session_state.started and not st.session_state.game_over:
-    update()
-    draw()
-    time.sleep(0.1)
-    st.rerun()
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_UP:
+                    bird.flap()
+
+        # -------- UPDATE --------
+        bird.update()
+
+        for pipe in pipes:
+            pipe.update()
+            if pipe.collide(bird):
+                return
+
+        if pipes[-1].x < WIDTH - 200:
+            pipes.append(Pipe())
+
+        if pipes[0].x < -60:
+            pipes.pop(0)
+            score += 1
+
+        if bird.y > HEIGHT or bird.y < 0:
+            return
+
+        # -------- DRAW --------
+        bird.draw()
+        for pipe in pipes:
+            pipe.draw()
+
+        score_text = font.render(f"Score: {score}", True, (0, 0, 0))
+        screen.blit(score_text, (10, 10))
+
+        pygame.display.update()
+
+
+# ---------------- RESTART LOOP ----------------
+while True:
+    main()

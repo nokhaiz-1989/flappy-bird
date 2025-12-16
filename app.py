@@ -98,4 +98,5 @@ st.markdown(f"### 🏆 Score: {st.session_state.score}")
 # ----------------- FRAME RATE -----------------
 if st.session_state.started and not st.session_state.game_over:
     time.sleep(0.1)
-    st.experimental_rerun()
+    st.rerun()
+

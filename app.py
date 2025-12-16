@@ -28,14 +28,14 @@ st.title("🐦 Flappy Bird (Streamlit Edition)")
 if not st.session_state.started:
     if st.button("▶ Start Game"):
         st.session_state.started = True
-        st.experimental_rerun()
+        st.rerun()
 
 if st.session_state.game_over:
     st.error("💥 Game Over!")
     if st.button("🔄 Restart"):
         for key in st.session_state.keys():
             del st.session_state[key]
-        st.experimental_rerun()
+        st.rerun()
 
 # ----------------- GAME CONTROLS -----------------
 if st.session_state.started and not st.session_state.game_over:
@@ -99,4 +99,5 @@ st.markdown(f"### 🏆 Score: {st.session_state.score}")
 if st.session_state.started and not st.session_state.game_over:
     time.sleep(0.1)
     st.rerun()
+
 
